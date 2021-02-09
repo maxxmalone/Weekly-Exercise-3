@@ -12,7 +12,7 @@ output:
 
 
 ```{r setup, include=FALSE}
-#knitr::opts_chunk$set(echo = TRUE, error=TRUE, message=FALSE, warning=FALSE)
+knitr::opts_chunk$set(echo = TRUE, error=TRUE, message=FALSE, warning=FALSE)
 ```
 
 ```{r libraries}
@@ -257,11 +257,27 @@ Trips %>%
        y = "")
 ```
 
+From this distribution we can see that on average, casual riders outnumber registered clients on the weekend. We can also see that during the week that the distribution between casual and registered bikers is different. The casual riders have a normal distribution while the registered riders have a bimodal distribution.
+
   12. Change the previous graph by adding the argument `position = position_stack()` to `geom_density()`. In your opinion, is this better or worse in terms of telling a story? What are the advantages/disadvantages of each?
   
 ```{r}
-
+Trips %>% 
+  mutate(hour = hour(sdate),
+         minute = minute(sdate),
+         time = (hour + (minute/60)),
+         wday = wday(sdate, label = TRUE)) %>%
+  ggplot(aes(x = time, fill = client))+
+  facet_wrap(vars(wday))+
+  geom_density(alpha = .5, color = NA, position = position_stack())+
+   labs(title = "Distribution of bike rentals by time of day
+        and client type",
+       x = "",
+       y = "")
 ```
+  
+  This graph tells a much better story than 11. There is not as much overlap which makes it easier for us to interpret the graph. This allows us be certain when making conclusions.
+  
   
   13. In this graph, go back to using the regular density plot (without `position = position_stack()`). Add a new variable to the dataset called `weekend` which will be "weekend" if the day is Saturday or Sunday and  "weekday" otherwise (HINT: use the `ifelse()` function and the `wday()` function from `lubridate`). Then, update the graph from the previous problem by faceting on the new `weekend` variable. 
   
@@ -270,13 +286,13 @@ Trips %>%
   mutate(hour = hour(sdate),
          minute = minute(sdate),
          time = (hour + (minute/60)),
-         day_of_week = wday(sdate, label = TRUE),
+         week_type = wday(sdate, label = TRUE),
          weekend = ifelse(wday(sdate) %in% c(1,7), "weekend", "weekday")) %>% 
   ggplot(aes(x = time, fill = client))+
   facet_wrap(vars(weekend))+
   geom_density(alpha = .5, color = NA)+
-   labs(title = "Distribution of bike rentals by time of day, type of Day,
-        and Type of Client",
+   labs(title = "Distribution of bike rentals by time of day, type of day,
+        and type of client",
        x = "",
        y = "")
 ```
@@ -284,46 +300,109 @@ Trips %>%
   14. Change the graph from the previous problem to facet on `client` and fill with `weekday`. What information does this graph tell you that the previous didn't? Is one graph better than the other?
   
 ```{r}
-
+Trips %>% 
+  mutate(hour = hour(sdate),
+         minute = minute(sdate),
+         time = (hour + (minute/60)),
+         week_type = wday(sdate, label = TRUE),
+         day_type = ifelse(wday(sdate) %in% c(1,7), "weekend", "weekday")) %>% 
+  ggplot(aes(x = time, fill = day_type))+
+  facet_wrap(vars(client))+
+  geom_density(alpha = .5, color = NA)+
+   labs(title = "Distribution of Bike Rentals by Time of Day, Type of Day,
+        and Type of Client",
+       x = "",
+       y = "")
 ```
+  
+I wouldn't say one graph is better than the other, because they both show us different things. This graph facets on client and fills with weekday rather than it being flipped for the graph for 13. This graph is more helpful if you wanted to look at the distributions within client type.
   
 ### Spatial patterns
 
   15. Use the latitude and longitude variables in `Stations` to make a visualization of the total number of departures from each station in the `Trips` data. Use either color or size to show the variation in number of departures. We will improve this plot next week when we learn about maps!
   
 ```{r}
-
+Trips %>% 
+  count(sstation) %>% 
+  inner_join(Stations,
+             by = c("sstation" = "name")) %>% 
+  ggplot(aes(x = long, y = lat, color = n))+
+  geom_point()+
+  labs(title = "Total departures from each station
+       by latitude and longitude",
+       x = "Longitude",
+       y = "Latitude")
 ```
   
   16. Only 14.4% of the trips in our data are carried out by casual users. Create a plot that shows which area(s) have stations with a much higher percentage of departures by casual users. What patterns do you notice? (Again, we'll improve this next week when we learn about maps).
   
 ```{r}
-
+Trips %>% 
+  group_by(sstation) %>% 
+  summarize(tot_dept = n(), 
+            prop_casual = mean(client == "Casual")) %>% 
+  left_join(Stations,
+            by = c("sstation" = "name")) %>% 
+  ggplot(aes(x = long, y = lat, color = prop_casual))+
+  geom_point(alpha = 0.5)+
+  labs(title = "Stations with a higher percentage
+  of departures by casual users",
+       x = "Longitude",
+       y = "Latitude")
 ```
+  
+I noticed this graph has a similar distribution to the graph above. We also see clusters around -77.1 longitude to -77.0 longitude. The proportions of most of the points are below 0.5 as well.
   
 ### Spatiotemporal patterns
 
   17. Make a table with the ten station-date combinations (e.g., 14th & V St., 2014-10-14) with the highest number of departures, sorted from most departures to fewest. Save this to a new dataset and print out the dataset. Hint: `as_date(sdate)` converts `sdate` from date-time format to date format. 
   
 ```{r}
+ten_trip <- Trips %>%
+  mutate(sdate = as_date(sdate)) %>% 
+  count(sstation, sdate) %>% 
+  slice_max(n = 10, order_by = n, with_ties = FALSE)
 
+ten_trip
 ```
   
   18. Use a join operation to make a table with only those trips whose departures match those top ten station-date combinations from the previous part.
   
 ```{r}
-
+Trips %>% 
+  mutate(sdate = as_date(sdate)) %>% 
+  inner_join(ten_trip, 
+             by = c("sstation", "sdate"))
 ```
   
   19. Build on the code from the previous problem (ie. copy that code below and then %>% into the next step.) and group the trips by client type and day of the week (use the name, not the number). Find the proportion of trips by day within each client type (ie. the proportions for all 7 days within each client type add up to 1). Display your results so day of week is a column and there is a column for each client type. Interpret your results.
 
 **DID YOU REMEMBER TO GO BACK AND CHANGE THIS SET OF EXERCISES TO THE LARGER DATASET? IF NOT, DO THAT NOW.**
 
+
+```{r}
+Trips%>% 
+  mutate(sdate = as_date(sdate)) %>% 
+  inner_join(ten_trip, by = c("sstation", "sdate")) %>%
+  mutate(day_of_week = wday(sdate, label = TRUE)) %>% 
+  group_by(client, day_of_week) %>% 
+  summarize(trips_day = n()) %>% 
+  group_by(client) %>% 
+  mutate(prop = trips_day/sum(trips_day)) %>% 
+  pivot_wider(id_cols = day_of_week,
+              names_from = client,
+              values_from = prop)
+```
+
+
+From this we can see that Registered riders rent a lot on Wednesdays and Thursdays while casual riders are more likley to rent on the weekend.
+
+
 ## GitHub link
 
   20. Below, provide a link to your GitHub page with this set of Weekly Exercises. Specifically, if the name of the file is 03_exercises.Rmd, provide a link to the 03_exercises.md file, which is the one that will be most readable on GitHub.
   
-[My Weekly 3 Git](https://github.com/maxxmalone/Weekly-Exercise-3.git). 
+[My Weekly 3 Git](https://github.com/maxxmalone/Weekly-Exercise-3). 
   
   
   
@@ -334,6 +413,6 @@ This problem uses the data from the Tidy Tuesday competition this week, `kids`. 
 
   21. In this exercise, you are going to try to replicate the graph below, created by Georgios Karamanis. I'm sure you can find the exact code on GitHub somewhere, but **DON'T DO THAT!** You will only be graded for putting an effort into this problem. So, give it a try and see how far you can get without doing too much googling. HINT: use `facet_geo()`. The graphic won't load below since it came from a location on my computer. So, you'll have to reference the original html on the moodle page to see it.
   
-![](kids_data_karamanis.jpeg)
+
 
 **DID YOU REMEMBER TO UNCOMMENT THE OPTIONS AT THE TOP?**
